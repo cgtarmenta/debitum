@@ -11,6 +11,11 @@ export const useGlobalStore = defineStore('global', {
     monthly_income: 0,
     max_debt_percentage: 0,
   }),
+  getters: {
+    maxAllowedMonthlyDebtBurden(): number {
+      return (this.monthly_income * this.max_debt_percentage) / 100;
+    },
+  },
   actions: {
     async loadGlobalInfo() {
       try {
@@ -18,7 +23,7 @@ export const useGlobalStore = defineStore('global', {
         this.monthly_income = data.monthly_income;
         this.max_debt_percentage = data.max_debt_percentage;
       } catch (error) {
-        console.error('Failed to load global info:', error);
+        console.error('Error in loadGlobalInfo action:', error);
       }
     },
     async saveGlobalInfo(payload: { monthly_income: number; max_debt_percentage: number }) {

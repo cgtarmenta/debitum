@@ -1,5 +1,14 @@
 import { defineStore } from 'pinia';
-import { addDebt, fetchDebts, updateDebt, deleteDebt } from '../services/api';
+import { addDebt, fetchDebts, updateDebt, deleteDebt, fetchAmortizationSchedule } from '../services/api';
+
+interface AmortizationEntry {
+  month: number;
+  interest: number;
+  principal: number;
+  insurance: number;
+  total_payment: number;
+  remaining_balance: number;
+}
 
 interface Debt {
   id?: string;
@@ -13,6 +22,7 @@ interface Debt {
   insurance_rate?: number;
   contractual_payment: number;
   amortization?: string;
+  amortizationSchedule?: AmortizationEntry[];
 }
 
 interface DebtState {
@@ -23,16 +33,35 @@ export const useDebtStore = defineStore('debts', {
   state: (): DebtState => ({
     debts: [],
   }),
+  getters: {
+    totalMonthlyDebtBurden(): number {
+      return this.debts.reduce((sum, debt) => {
+        if (debt.amortizationSchedule && debt.amortizationSchedule.length > 0) {
+          // Assuming the first entry in the schedule is the current monthly payment
+          return sum + debt.amortizationSchedule[0].total_payment;
+        }
+        return sum;
+      }, 0);
+    },
+  },
   actions: {
     async loadDebts() {
       try {
         const fetchedDebts = await fetchDebts();
-        this.debts = fetchedDebts.map((debt: any) => ({
-          ...debt,
-          id: debt._id,
+        this.debts = await Promise.all(fetchedDebts.map(async (debt: any) => {
+          const newDebt: Debt = { ...debt, id: debt._id };
+          if (newDebt.amortization === 'french' && newDebt.id) {
+            try {
+              const schedule = await fetchAmortizationSchedule(newDebt.id);
+              newDebt.amortizationSchedule = schedule.schedule;
+            } catch (error) {
+              console.error(`Error fetching amortization for debt ${newDebt.id}:`, error);
+            }
+          }
+          return newDebt;
         }));
       } catch (error) {
-        console.error('Failed to load debts:', error);
+        console.error('Error in loadDebts action:', error);
       }
     },
     async addDebt(debt: Debt) {
