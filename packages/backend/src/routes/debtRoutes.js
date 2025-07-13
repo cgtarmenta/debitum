@@ -1,44 +1,21 @@
-/**
- * @typedef {object} Debt
- * @property {number} id - Unique identifier for the debt.
- * @property {string} title - Title or name of the debt.
- * @property {number} debt - Total amount of the debt.
- * @property {string} periodicity - How often payments are made (e.g., 'monthly', 'weekly').
- * @property {number} payment_term - Number of periods over which the debt is paid.
- * @property {number} nir - Nominal Interest Rate (as a percentage).
- * @property {number} aer - Annual Equivalent Rate (as a percentage).
- */
-
-/**
- * @typedef {object} GlobalInfo
- * @property {number} id - Unique identifier for global info (should be 1).
- * @property {number} monthly_income - User's monthly income.
- * @property {number} max_debt_percentage - Maximum percentage of income to spend on debt.
- */
+'use strict';
 
 const Joi = require('joi');
 const Boom = require('@hapi/boom');
+const { Debt, GlobalInfo } = require('../db');
 
 /**
  * Registers debt-related routes with the Hapi server.
  * @param {Hapi.Server} server - The Hapi server instance.
- * @param {sqlite3.Database} db - The SQLite database instance.
  */
-const registerDebtRoutes = (server, db) => {
+const registerDebtRoutes = (server) => {
 
-  /**
-   * @api {get} /debts Get all debts
-   * @apiName GetDebts
-   * @apiGroup Debts
-   * @apiSuccess {Debt[]} debts List of debt objects.
-   * @apiError (Error 500) InternalServerError Could not retrieve debts.
-   */
   server.route({
     method: 'GET',
     path: '/debts',
     handler: async (request, h) => {
       try {
-        const debts = await db.all('SELECT * FROM debts');
+        const debts = await Debt.find();
         return h.response(debts).code(200);
       } catch (err) {
         console.error('Error fetching debts:', err.message);
@@ -47,20 +24,6 @@ const registerDebtRoutes = (server, db) => {
     },
   });
 
-  /**
-   * @api {post} /debts Add a new debt
-   * @apiName AddDebt
-   * @apiGroup Debts
-   * @apiParam {string} title Title of the debt.
-   * @apiParam {number} debt Total amount of the debt.
-   * @apiParam {string} periodicity How often payments are made.
-   * @apiParam {number} payment_term Number of periods over which the debt is paid.
-   * @apiParam {number} nir Nominal Interest Rate.
-   * @apiParam {number} aer Annual Equivalent Rate.
-   * @apiSuccess {object} message Success message.
-   * @apiError (Error 400) BadRequest Invalid input data.
-   * @apiError (Error 500) InternalServerError Could not add debt.
-   */
   server.route({
     method: 'POST',
     path: '/debts',
@@ -83,12 +46,9 @@ const registerDebtRoutes = (server, db) => {
     },
     handler: async (request, h) => {
       try {
-        const { title, debt, periodicity, payment_term, nir, aer, start_date } = request.payload;
-        await db.run(
-          'INSERT INTO debts (title, debt, periodicity, payment_term, nir, aer, start_date) VALUES (?, ?, ?, ?, ?, ?, ?)',
-          [title, debt, periodicity, payment_term, nir, aer, start_date]
-        );
-        return h.response({ message: 'Debt added successfully' }).code(201);
+        const debt = new Debt(request.payload);
+        await debt.save();
+        return h.response({ message: 'Debt added successfully', id: debt._id }).code(201);
       } catch (err) {
         console.error('Error adding debt:', err.message);
         throw Boom.badImplementation('Could not add debt');
@@ -96,29 +56,13 @@ const registerDebtRoutes = (server, db) => {
     },
   });
 
-  /**
-   * @api {put} /debts/:id Update a debt
-   * @apiName UpdateDebt
-   * @apiGroup Debts
-   * @apiParam {number} id Debt ID.
-   * @apiParam {string} [title] Title of the debt.
-   * @apiParam {number} [debt] Total amount of the debt.
-   * @apiParam {string} [periodicity] How often payments are made.
-   * @apiParam {number} [payment_term] Number of periods over which the debt is paid.
-   * @apiParam {number} [nir] Nominal Interest Rate.
-   * @apiParam {number} [aer] Annual Equivalent Rate.
-   * @apiSuccess {object} message Success message.
-   * @apiError (Error 400) BadRequest Invalid input data.
-   * @apiError (Error 404) NotFound Debt not found.
-   * @apiError (Error 500) InternalServerError Could not update debt.
-   */
   server.route({
     method: 'PUT',
     path: '/debts/{id}',
     options: {
       validate: {
         params: Joi.object({
-          id: Joi.number().integer().required(),
+          id: Joi.string().hex().length(24).required(),
         }),
         payload: Joi.object({
           title: Joi.string().optional(),
@@ -128,7 +72,7 @@ const registerDebtRoutes = (server, db) => {
           nir: Joi.number().optional(),
           aer: Joi.number().optional(),
           start_date: Joi.date().iso().optional(),
-        }).min(1), // At least one field must be provided for update
+        }).min(1),
         failAction: (request, h, err) => {
           console.error('Joi Validation Error:', err.details);
           throw Boom.badRequest('Invalid request payload input', err.details);
@@ -139,19 +83,8 @@ const registerDebtRoutes = (server, db) => {
       try {
         const { id } = request.params;
         const fields = request.payload;
-        const setClause = Object.keys(fields).map(key => `${key} = ?`).join(', ');
-        const values = Object.values(fields);
-
-        if (values.length === 0) {
-          throw Boom.badRequest('No fields provided for update');
-        }
-
-        const result = await db.run(
-          `UPDATE debts SET ${setClause} WHERE id = ?`,
-          [...values, id]
-        );
-
-        if (result.changes === 0) {
+        const updatedDebt = await Debt.findByIdAndUpdate(id, fields, { new: true });
+        if (!updatedDebt) {
           throw Boom.notFound('Debt not found');
         }
         return h.response({ message: 'Debt updated successfully' }).code(200);
@@ -165,30 +98,21 @@ const registerDebtRoutes = (server, db) => {
     },
   });
 
-  /**
-   * @api {delete} /debts/:id Delete a debt
-   * @apiName DeleteDebt
-   * @apiGroup Debts
-   * @apiParam {number} id Debt ID.
-   * @apiSuccess {object} message Success message.
-   * @apiError (Error 404) NotFound Debt not found.
-   * @apiError (Error 500) InternalServerError Could not delete debt.
-   */
   server.route({
     method: 'DELETE',
     path: '/debts/{id}',
     options: {
       validate: {
         params: Joi.object({
-          id: Joi.number().integer().required(),
+          id: Joi.string().hex().length(24).required(),
         }),
       },
     },
     handler: async (request, h) => {
       try {
         const { id } = request.params;
-        const result = await db.run('DELETE FROM debts WHERE id = ?', id);
-        if (result.changes === 0) {
+        const deletedDebt = await Debt.findByIdAndDelete(id);
+        if (!deletedDebt) {
           throw Boom.notFound('Debt not found');
         }
         return h.response({ message: 'Debt deleted successfully' }).code(200);
@@ -202,19 +126,12 @@ const registerDebtRoutes = (server, db) => {
     },
   });
 
-  /**
-   * @api {get} /global-info Get global financial information
-   * @apiName GetGlobalInfo
-   * @apiGroup GlobalInfo
-   * @apiSuccess {GlobalInfo} globalInfo Global financial information object.
-   * @apiError (Error 500) InternalServerError Could not retrieve global info.
-   */
   server.route({
     method: 'GET',
     path: '/global-info',
     handler: async (request, h) => {
       try {
-        const globalInfo = await db.get('SELECT * FROM global_info WHERE id = 1');
+        const globalInfo = await GlobalInfo.findOne();
         return h.response(globalInfo).code(200);
       } catch (err) {
         console.error('Error fetching global info:', err.message);
@@ -223,16 +140,6 @@ const registerDebtRoutes = (server, db) => {
     },
   });
 
-  /**
-   * @api {put} /global-info Update global financial information
-   * @apiName UpdateGlobalInfo
-   * @apiGroup GlobalInfo
-   * @apiParam {number} monthly_income User's monthly income.
-   * @apiParam {number} max_debt_percentage Maximum percentage of income to spend on debt.
-   * @apiSuccess {object} message Success message.
-   * @apiError (Error 400) BadRequest Invalid input data.
-   * @apiError (Error 500) InternalServerError Could not update global info.
-   */
   server.route({
     method: 'PUT',
     path: '/global-info',
@@ -247,10 +154,7 @@ const registerDebtRoutes = (server, db) => {
     handler: async (request, h) => {
       try {
         const { monthly_income, max_debt_percentage } = request.payload;
-        await db.run(
-          'UPDATE global_info SET monthly_income = ?, max_debt_percentage = ? WHERE id = 1',
-          [monthly_income, max_debt_percentage]
-        );
+        await GlobalInfo.findOneAndUpdate({}, { monthly_income, max_debt_percentage }, { upsert: true });
         return h.response({ message: 'Global info updated successfully' }).code(200);
       } catch (err) {
         console.error('Error updating global info:', err.message);

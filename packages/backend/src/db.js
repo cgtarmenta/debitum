@@ -1,51 +1,40 @@
-const sqlite3 = require('sqlite3');
-const { open } = require('sqlite');
-const path = require('path');
+'use strict';
 
-const DB_PATH = path.resolve(__dirname, process.env.DB_PATH || '../debitum.db');
-console.log('DB_PATH being used:', DB_PATH);
+const mongoose = require('mongoose');
+
+const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/debitum';
+
+const debtSchema = new mongoose.Schema({
+  title: { type: String, required: true },
+  debt: { type: Number, required: true },
+  periodicity: { type: String, required: true },
+  payment_term: { type: Number, required: true },
+  nir: { type: Number, required: true },
+  aer: { type: Number, required: true },
+  start_date: { type: Date, required: true },
+});
+
+const globalInfoSchema = new mongoose.Schema({
+  monthly_income: { type: Number, default: 0 },
+  max_debt_percentage: { type: Number, default: 0 },
+});
+
+const Debt = mongoose.model('Debt', debtSchema);
+const GlobalInfo = mongoose.model('GlobalInfo', globalInfoSchema);
 
 /**
- * Initializes the SQLite database and creates necessary tables if they don't exist.
- * @returns {Promise<sqlite.Database>} A promise that resolves with the database instance.
+ * Initializes the Mongoose connection.
  */
-async function initializeDatabase(dbPath = DB_PATH) {
-  const db = await open({
-    filename: dbPath,
-    driver: sqlite3.Database,
-  });
+async function initializeDatabase() {
+  await mongoose.connect(MONGODB_URI);
+  console.log('Connected to the MongoDB database using Mongoose.');
 
-  await db.exec(`
-    CREATE TABLE IF NOT EXISTS debts (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      title TEXT NOT NULL,
-      debt REAL NOT NULL,
-      periodicity TEXT NOT NULL,
-      payment_term INTEGER NOT NULL,
-      nir REAL NOT NULL,
-      aer REAL NOT NULL,
-      start_date TEXT NOT NULL
-    );
-  `);
-
-  await db.exec(`
-    CREATE TABLE IF NOT EXISTS global_info (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      monthly_income REAL NOT NULL,
-      max_debt_percentage REAL NOT NULL
-    );
-  `);
-
-  // Insert a default row into global_info if it's empty
-  const row = await db.get("SELECT COUNT(*) as count FROM global_info");
-  console.log('Count of global_info rows:', row);
-  if (!row || row.count === 0) {
-    await db.run(`INSERT INTO global_info (monthly_income, max_debt_percentage) VALUES (?, ?)`, [0, 0]);
+  // Ensure the global_info collection has a default document
+  const count = await GlobalInfo.countDocuments();
+  if (count === 0) {
+    await GlobalInfo.create({ monthly_income: 0, max_debt_percentage: 0 });
     console.log('Inserted default global info.');
   }
-
-  console.log('Connected to the SQLite database and tables ensured.');
-  return db;
 }
 
-module.exports = initializeDatabase;
+module.exports = { initializeDatabase, Debt, GlobalInfo };

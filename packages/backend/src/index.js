@@ -1,13 +1,14 @@
 'use strict';
 
+require('dotenv').config();
 const Hapi = require('@hapi/hapi');
-const initializeDatabase = require('./db');
+const { initializeDatabase } = require('./db');
 
 /**
  * Initializes and starts the Hapi server.
  */
 const createServer = async () => {
-  const db = await initializeDatabase(process.env.DB_PATH);
+  await initializeDatabase();
 
   const server = Hapi.server({
     port: process.env.PORT || 3000,
@@ -25,7 +26,7 @@ const createServer = async () => {
   await server.register(require('./plugins/errorHandling'));
 
   const registerDebtRoutes = require('./routes/debtRoutes');
-  registerDebtRoutes(server, db);
+  registerDebtRoutes(server);
 
   return server;
 };

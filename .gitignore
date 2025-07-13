@@ -25,3 +25,7 @@ yarn-error.log*
 
 # database
 *.db
+
+# Environment variables
+.env
+packages/backend/.env
