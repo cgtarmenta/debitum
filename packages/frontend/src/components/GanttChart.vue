@@ -28,7 +28,7 @@ ChartJS.register(
 const debtStore = useDebtStore();
 
 interface Debt {
-  id?: number;
+  id?: string;
   title: string;
   debt: number;
   periodicity: string;
@@ -71,12 +71,12 @@ const chartData = computed(() => {
 });
 
 const chartOptions = {
-  indexAxis: 'y', // This makes it a horizontal bar chart
+  indexAxis: 'y' as const, // This makes it a horizontal bar chart
   responsive: true,
   maintainAspectRatio: false,
   plugins: {
     legend: {
-      position: 'top',
+      position: 'top' as const,
     },
     title: {
       display: true,

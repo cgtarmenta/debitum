@@ -51,7 +51,7 @@ const chartOptions = {
   maintainAspectRatio: false,
   plugins: {
     legend: {
-      position: 'right',
+      position: 'right' as const,
     },
     title: {
       display: true,

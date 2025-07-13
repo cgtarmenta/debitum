@@ -23,7 +23,7 @@ export const useNotificationStore = defineStore('notification', {
 
       this.timeoutId = setTimeout(() => {
         this.clearNotification();
-      }, duration);
+      }, duration) as unknown as number;
     },
     clearNotification() {
       this.message = null;

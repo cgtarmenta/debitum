@@ -123,7 +123,7 @@ import { useRoute, useRouter } from 'vue-router';
 import { useDebtStore } from '../store/debtStore';
 
 interface DebtForm {
-  id?: number;
+  id?: string;
   title: string;
   debt: number;
   periodicity: string;
@@ -131,7 +131,7 @@ interface DebtForm {
   nir: number;
   aer: number;
   start_date: string;
-  amortization: string;
+  amortization?: string;
 }
 
 const debt = ref<DebtForm | null>(null); // Initialize as null
@@ -199,9 +199,9 @@ const handleSubmit = async () => {
 
   if (debt.value!.id) {
     const { id, ...debtData } = debt.value!;
-    await debtStore.updateDebt(id, debtData);
+    await debtStore.updateDebt(id as string, debtData);
   } else {
-    await debtStore.addDebt(debt.value!);
+    await debtStore.addDebt(debt.value! as DebtForm);
   }
 
   // Navigate back to dashboard after successful submission
@@ -233,7 +233,7 @@ onMounted(async () => {
       nir: 0,
       aer: 0,
       start_date: formattedDate,
-      amortization: 'french',
+      amortization: 'french' as string | undefined,
     };
   }
 });

@@ -30,7 +30,7 @@ ChartJS.register(
 const debtStore = useDebtStore();
 
 interface Debt {
-  id?: number;
+  id?: string;
   title: string;
   debt: number;
   periodicity: string;
@@ -111,7 +111,7 @@ const chartOptions = {
   maintainAspectRatio: false,
   plugins: {
     legend: {
-      position: 'top',
+      position: 'top' as const,
     },
     title: {
       display: true,
