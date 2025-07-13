@@ -10,6 +10,7 @@ interface Debt {
   nir: number;
   aer: number;
   start_date: string;
+  insurance_rate?: number;
   amortization?: string;
 }
 

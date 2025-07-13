@@ -65,6 +65,7 @@ const registerDebtRoutes = (server) => {
           nir: Joi.number().required(),
           aer: Joi.number().required(),
           start_date: Joi.date().iso().required(),
+          insurance_rate: Joi.number().min(0).optional(),
           amortization: Joi.string().valid('french').optional(),
         }),
         failAction: (request, h, err) => {
@@ -109,6 +110,7 @@ const registerDebtRoutes = (server) => {
           nir: Joi.number().optional(),
           aer: Joi.number().optional(),
           start_date: Joi.date().iso().optional(),
+          insurance_rate: Joi.number().min(0).optional(),
           amortization: Joi.string().valid('french').optional(),
         }).min(1),
         failAction: (request, h, err) => {
@@ -191,22 +193,54 @@ const registerDebtRoutes = (server) => {
           throw Boom.notFound('Debt not found');
         }
 
-        const { debt: principal, nir, payment_term } = debt;
-        const monthlyInterestRate = nir / 100 / 12;
-        const monthlyPayment = (principal * monthlyInterestRate) / (1 - Math.pow(1 + monthlyInterestRate, -payment_term));
+        const { debt: principal, nir, payment_term, periodicity, insurance_rate } = debt;
+
+        let periodicInterestRate;
+        let numberOfPayments;
+
+        switch (periodicity) {
+          case 'monthly':
+            periodicInterestRate = nir / 100 / 12;
+            numberOfPayments = payment_term;
+            break;
+          case 'weekly':
+            periodicInterestRate = nir / 100 / 52;
+            numberOfPayments = payment_term;
+            break;
+          case 'bi-weekly':
+            periodicInterestRate = nir / 100 / 26;
+            numberOfPayments = payment_term;
+            break;
+          case 'quarterly':
+            periodicInterestRate = nir / 100 / 4;
+            numberOfPayments = payment_term;
+            break;
+          case 'annually':
+            periodicInterestRate = nir / 100 / 1;
+            numberOfPayments = payment_term;
+            break;
+          default:
+            throw Boom.badImplementation('Unsupported periodicity');
+        }
+
+        const fixedPayment = (principal * periodicInterestRate) / (1 - Math.pow(1 + periodicInterestRate, -numberOfPayments));
 
         let remaining_balance = principal;
         const schedule = [];
 
-        for (let month = 1; month <= payment_term; month++) {
-          const interest = remaining_balance * monthlyInterestRate;
-          const principal_paid = monthlyPayment - interest;
+        for (let month = 1; month <= numberOfPayments; month++) {
+          const interest = remaining_balance * periodicInterestRate;
+          const principal_paid = fixedPayment - interest;
+          const insuranceCost = (remaining_balance * insurance_rate) / 100;
+          const totalMonthlyPayment = fixedPayment + insuranceCost;
           remaining_balance -= principal_paid;
           schedule.push({
             month,
-            interest,
-            principal: principal_paid,
-            remaining_balance,
+            interest: parseFloat(interest.toFixed(2)),
+            principal: parseFloat(principal_paid.toFixed(2)),
+            insurance: parseFloat(insuranceCost.toFixed(2)),
+            total_payment: parseFloat(totalMonthlyPayment.toFixed(2)),
+            remaining_balance: parseFloat(remaining_balance.toFixed(2)),
           });
         }
 

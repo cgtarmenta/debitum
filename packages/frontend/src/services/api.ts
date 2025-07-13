@@ -11,6 +11,7 @@ interface Debt {
   nir: number;
   aer: number;
   start_date: string;
+  insurance_rate?: number;
   amortization?: string;
 }
 
@@ -18,6 +19,8 @@ interface AmortizationEntry {
   month: number;
   interest: number;
   principal: number;
+  insurance: number;
+  total_payment: number;
   remaining_balance: number;
 }
 

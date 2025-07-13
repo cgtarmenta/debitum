@@ -28,7 +28,7 @@ const isLoadingAmortization = ref(false);
 
 const getMonthlyPaymentFromSchedule = (schedule: any[]): number => {
   if (schedule && schedule.length > 0) {
-    return schedule[0].principal + schedule[0].interest;
+    return schedule[0].total_payment;
   }
   return 0;
 };

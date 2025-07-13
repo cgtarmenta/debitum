@@ -78,6 +78,17 @@
           />
           <p v-if="validationErrors.aer" class="text-red-500 text-xs italic">{{ validationErrors.aer }}</p>
         </div>
+        <div class="mb-4">
+          <label for="insuranceRate" class="block text-gray-700 text-sm font-bold mb-2">Insurance Rate (% of pending capital):</label>
+          <input
+            type="number"
+            id="insuranceRate"
+            v-model.number="debt.insurance_rate"
+            class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
+            step="0.01"
+          />
+          <p v-if="validationErrors.insurance_rate" class="text-red-500 text-xs italic">{{ validationErrors.insurance_rate }}</p>
+        </div>
         <div class="mb-6">
           <label for="startDate" class="block text-gray-700 text-sm font-bold mb-2">Start Date:</label>
           <input
@@ -131,6 +142,7 @@ interface DebtForm {
   nir: number;
   aer: number;
   start_date: string;
+  insurance_rate?: number;
   amortization?: string;
 }
 
@@ -149,12 +161,13 @@ const validationErrors = ref({
   aer: '',
   start_date: '',
   amortization: '',
+  insurance_rate: '',
 });
 
 const validateForm = () => {
   let isValid = true;
   // Reset validation errors
-  validationErrors.value = { title: '', debt: '', periodicity: '', payment_term: '', nir: '', aer: '', start_date: '', amortization: '' };
+  validationErrors.value = { title: '', debt: '', periodicity: '', payment_term: '', nir: '', aer: '', start_date: '', amortization: '', insurance_rate: '' };
 
   if (!debt.value!.title) {
     validationErrors.value.title = 'Title is required.';
@@ -180,6 +193,10 @@ const validateForm = () => {
     validationErrors.value.aer = 'AER cannot be negative.';
     isValid = false;
   }
+  if (debt.value!.insurance_rate && debt.value!.insurance_rate < 0) {
+    validationErrors.value.insurance_rate = 'Insurance rate cannot be negative.';
+    isValid = false;
+  }
   if (!debt.value!.start_date) {
     validationErrors.value.start_date = 'Start date is required.';
     isValid = false;
@@ -197,11 +214,34 @@ const handleSubmit = async () => {
     return;
   }
 
+  const payload: Partial<DebtForm> = {};
+  const allowedFields: Array<keyof DebtForm> = [
+    'title',
+    'debt',
+    'periodicity',
+    'payment_term',
+    'nir',
+    'aer',
+    'start_date',
+    'insurance_rate',
+    'amortization',
+  ];
+
+  for (const field of allowedFields) {
+    if (debt.value![field] !== undefined) {
+      payload[field] = debt.value![field];
+    }
+  }
+
+  // Convert start_date to ISO string for backend
+  if (payload.start_date) {
+    payload.start_date = new Date(payload.start_date).toISOString();
+  }
+
   if (debt.value!.id) {
-    const { id, ...debtData } = debt.value!;
-    await debtStore.updateDebt(id as string, debtData);
+    await debtStore.updateDebt(debt.value!.id, payload);
   } else {
-    await debtStore.addDebt(debt.value! as DebtForm);
+    await debtStore.addDebt(payload as DebtForm);
   }
 
   // Navigate back to dashboard after successful submission
@@ -215,7 +255,7 @@ onMounted(async () => {
     console.log('Debts in store after load:', debtStore.debts);
     const existingDebt = debtStore.debts.find(d => d.id === debtId);
     if (existingDebt) {
-      debt.value = { ...existingDebt };
+      debt.value = { ...existingDebt, start_date: existingDebt.start_date.split('T')[0] };
     } else {
       console.error('Debt not found for editing.');
       router.push('/debt-entry'); // Redirect to add new debt if not found
@@ -234,6 +274,7 @@ onMounted(async () => {
       aer: 0,
       start_date: formattedDate,
       amortization: 'french' as string | undefined,
+      insurance_rate: 0,
     };
   }
 });

@@ -50,7 +50,8 @@ onMounted(() => {
   debtStore.loadDebts();
 });
 
-const confirmDelete = async (id: string) => {
+const confirmDelete = async (id: string | undefined) => {
+  if (id === undefined) return;
   console.log('Attempting to delete debt with ID:', id);
   if (confirm('Are you sure you want to delete this debt?')) {
     await debtStore.deleteDebt(id);
