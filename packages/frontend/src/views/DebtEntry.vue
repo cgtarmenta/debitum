@@ -214,24 +214,17 @@ const handleSubmit = async () => {
     return;
   }
 
-  const payload: Partial<DebtForm> = {};
-  const allowedFields: Array<keyof DebtForm> = [
-    'title',
-    'debt',
-    'periodicity',
-    'payment_term',
-    'nir',
-    'aer',
-    'start_date',
-    'insurance_rate',
-    'amortization',
-  ];
-
-  for (const field of allowedFields) {
-    if (debt.value![field] !== undefined) {
-      payload[field] = debt.value![field];
-    }
-  }
+  const payload: DebtForm = {
+    title: debt.value!.title,
+    debt: debt.value!.debt,
+    periodicity: debt.value!.periodicity,
+    payment_term: debt.value!.payment_term,
+    nir: debt.value!.nir,
+    aer: debt.value!.aer,
+    start_date: debt.value!.start_date,
+    amortization: debt.value!.amortization || 'french', // Ensure amortization is always set
+    insurance_rate: debt.value!.insurance_rate,
+  };
 
   // Convert start_date to ISO string for backend
   if (payload.start_date) {
@@ -241,7 +234,7 @@ const handleSubmit = async () => {
   if (debt.value!.id) {
     await debtStore.updateDebt(debt.value!.id, payload);
   } else {
-    await debtStore.addDebt(payload as DebtForm);
+    await debtStore.addDebt(payload);
   }
 
   // Navigate back to dashboard after successful submission
