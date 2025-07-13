@@ -89,6 +89,18 @@
           />
           <p v-if="validationErrors.insurance_rate" class="text-red-500 text-xs italic">{{ validationErrors.insurance_rate }}</p>
         </div>
+        <div class="mb-4">
+          <label for="contractualPayment" class="block text-gray-700 text-sm font-bold mb-2">Contractual Monthly Payment:</label>
+          <input
+            type="number"
+            id="contractualPayment"
+            v-model.number="debt.contractual_payment"
+            class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
+            step="0.01"
+            required
+          />
+          <p v-if="validationErrors.contractual_payment" class="text-red-500 text-xs italic">{{ validationErrors.contractual_payment }}</p>
+        </div>
         <div class="mb-6">
           <label for="startDate" class="block text-gray-700 text-sm font-bold mb-2">Start Date:</label>
           <input
@@ -143,6 +155,7 @@ interface DebtForm {
   aer: number;
   start_date: string;
   insurance_rate?: number;
+  contractual_payment: number;
   amortization?: string;
 }
 
@@ -162,12 +175,13 @@ const validationErrors = ref({
   start_date: '',
   amortization: '',
   insurance_rate: '',
+  contractual_payment: '',
 });
 
 const validateForm = () => {
   let isValid = true;
   // Reset validation errors
-  validationErrors.value = { title: '', debt: '', periodicity: '', payment_term: '', nir: '', aer: '', start_date: '', amortization: '', insurance_rate: '' };
+  validationErrors.value = { title: '', debt: '', periodicity: '', payment_term: '', nir: '', aer: '', start_date: '', amortization: '', insurance_rate: '', contractual_payment: '' };
 
   if (!debt.value!.title) {
     validationErrors.value.title = 'Title is required.';
@@ -197,6 +211,10 @@ const validateForm = () => {
     validationErrors.value.insurance_rate = 'Insurance rate cannot be negative.';
     isValid = false;
   }
+  if (debt.value!.contractual_payment <= 0) {
+    validationErrors.value.contractual_payment = 'Contractual payment must be a positive number.';
+    isValid = false;
+  }
   if (!debt.value!.start_date) {
     validationErrors.value.start_date = 'Start date is required.';
     isValid = false;
@@ -224,6 +242,7 @@ const handleSubmit = async () => {
     start_date: debt.value!.start_date,
     amortization: debt.value!.amortization || 'french', // Ensure amortization is always set
     insurance_rate: debt.value!.insurance_rate,
+    contractual_payment: debt.value!.contractual_payment,
   };
 
   // Convert start_date to ISO string for backend
@@ -268,6 +287,7 @@ onMounted(async () => {
       start_date: formattedDate,
       amortization: 'french' as string | undefined,
       insurance_rate: 0,
+      contractual_payment: 0,
     };
   }
 });

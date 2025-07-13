@@ -11,6 +11,7 @@ interface Debt {
   aer: number;
   start_date: string;
   insurance_rate?: number;
+  contractual_payment: number;
   amortization?: string;
 }
 

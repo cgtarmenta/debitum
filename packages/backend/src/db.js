@@ -13,6 +13,7 @@ const debtSchema = new mongoose.Schema({
   aer: { type: Number, required: true },
   start_date: { type: Date, required: true },
   insurance_rate: { type: Number, default: 0 },
+  contractual_payment: { type: Number, required: true },
   amortization: { type: String, enum: ['french'], default: 'french' },
 });
 
