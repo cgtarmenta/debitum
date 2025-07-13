@@ -2,7 +2,7 @@
 
 const Joi = require('joi');
 const Boom = require('@hapi/boom');
-const { Debt, GlobalInfo } = require('../db');
+const { Debt, GlobalInfo, Amortization } = require('../db');
 
 /**
  * Registers debt-related routes with the Hapi server.
@@ -25,6 +25,34 @@ const registerDebtRoutes = (server) => {
   });
 
   server.route({
+    method: 'GET',
+    path: '/debts/{id}',
+    options: {
+      validate: {
+        params: Joi.object({
+          id: Joi.string().hex().length(24).required(),
+        }),
+      },
+    },
+    handler: async (request, h) => {
+      try {
+        const { id } = request.params;
+        const debt = await Debt.findById(id);
+        if (!debt) {
+          throw Boom.notFound('Debt not found');
+        }
+        return h.response(debt).code(200);
+      } catch (err) {
+        console.error('Error fetching debt by ID:', err.message);
+        if (err.isBoom) {
+          throw err;
+        }
+        throw Boom.badImplementation('Could not retrieve debt');
+      }
+    },
+  });
+
+  server.route({
     method: 'POST',
     path: '/debts',
     options: {
@@ -37,6 +65,7 @@ const registerDebtRoutes = (server) => {
           nir: Joi.number().required(),
           aer: Joi.number().required(),
           start_date: Joi.date().iso().required(),
+          amortization: Joi.string().valid('french').optional(),
         }),
         failAction: (request, h, err) => {
           console.error('Joi Validation Error:', err.details);
@@ -48,6 +77,14 @@ const registerDebtRoutes = (server) => {
       try {
         const debt = new Debt(request.payload);
         await debt.save();
+
+        if (debt.amortization === 'french') {
+          await h.request.server.inject({
+            method: 'POST',
+            url: `/debts/${debt._id}/calculate-amortization`,
+          });
+        }
+
         return h.response({ message: 'Debt added successfully', id: debt._id }).code(201);
       } catch (err) {
         console.error('Error adding debt:', err.message);
@@ -72,6 +109,7 @@ const registerDebtRoutes = (server) => {
           nir: Joi.number().optional(),
           aer: Joi.number().optional(),
           start_date: Joi.date().iso().optional(),
+          amortization: Joi.string().valid('french').optional(),
         }).min(1),
         failAction: (request, h, err) => {
           console.error('Joi Validation Error:', err.details);
@@ -87,6 +125,14 @@ const registerDebtRoutes = (server) => {
         if (!updatedDebt) {
           throw Boom.notFound('Debt not found');
         }
+
+        if (fields.amortization === 'french') {
+          await h.request.server.inject({
+            method: 'POST',
+            url: `/debts/${updatedDebt._id}/calculate-amortization`,
+          });
+        }
+
         return h.response({ message: 'Debt updated successfully' }).code(200);
       } catch (err) {
         console.error('Error updating debt:', err.message);
@@ -115,6 +161,7 @@ const registerDebtRoutes = (server) => {
         if (!deletedDebt) {
           throw Boom.notFound('Debt not found');
         }
+        await Amortization.deleteOne({ debt_id: id });
         return h.response({ message: 'Debt deleted successfully' }).code(200);
       } catch (err) {
         console.error('Error deleting debt:', err.message);
@@ -122,6 +169,88 @@ const registerDebtRoutes = (server) => {
           throw err;
         }
         throw Boom.badImplementation('Could not delete debt');
+      }
+    },
+  });
+
+  server.route({
+    method: 'POST',
+    path: '/debts/{id}/calculate-amortization',
+    options: {
+      validate: {
+        params: Joi.object({
+          id: Joi.string().hex().length(24).required(),
+        }),
+      },
+    },
+    handler: async (request, h) => {
+      try {
+        const { id } = request.params;
+        const debt = await Debt.findById(id);
+        if (!debt) {
+          throw Boom.notFound('Debt not found');
+        }
+
+        const { debt: principal, nir, payment_term } = debt;
+        const monthlyInterestRate = nir / 100 / 12;
+        const monthlyPayment = (principal * monthlyInterestRate) / (1 - Math.pow(1 + monthlyInterestRate, -payment_term));
+
+        let remaining_balance = principal;
+        const schedule = [];
+
+        for (let month = 1; month <= payment_term; month++) {
+          const interest = remaining_balance * monthlyInterestRate;
+          const principal_paid = monthlyPayment - interest;
+          remaining_balance -= principal_paid;
+          schedule.push({
+            month,
+            interest,
+            principal: principal_paid,
+            remaining_balance,
+          });
+        }
+
+        await Amortization.findOneAndUpdate(
+          { debt_id: id },
+          { schedule },
+          { upsert: true, new: true }
+        );
+
+        return h.response({ message: 'Amortization schedule calculated and saved successfully' }).code(200);
+      } catch (err) {
+        console.error('Error calculating amortization schedule:', err.message);
+        if (err.isBoom) {
+          throw err;
+        }
+        throw Boom.badImplementation('Could not calculate amortization schedule');
+      }
+    },
+  });
+
+  server.route({
+    method: 'GET',
+    path: '/debts/{id}/amortization',
+    options: {
+      validate: {
+        params: Joi.object({
+          id: Joi.string().hex().length(24).required(),
+        }),
+      },
+    },
+    handler: async (request, h) => {
+      try {
+        const { id } = request.params;
+        const amortization = await Amortization.findOne({ debt_id: id });
+        if (!amortization) {
+          throw Boom.notFound('Amortization schedule not found for this debt.');
+        }
+        return h.response(amortization).code(200);
+      } catch (err) {
+        console.error('Error fetching amortization schedule:', err.message);
+        if (err.isBoom) {
+          throw err;
+        }
+        throw Boom.badImplementation('Could not retrieve amortization schedule');
       }
     },
   });

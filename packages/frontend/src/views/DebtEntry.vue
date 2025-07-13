@@ -89,6 +89,18 @@
           />
           <p v-if="validationErrors.start_date" class="text-red-500 text-xs italic">{{ validationErrors.start_date }}</p>
         </div>
+        <div class="mb-6">
+          <label for="amortization" class="block text-gray-700 text-sm font-bold mb-2">Amortization Type:</label>
+          <select
+            id="amortization"
+            v-model="debt.amortization"
+            class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
+            required
+          >
+            <option value="french">French Amortization</option>
+          </select>
+          <p v-if="validationErrors.amortization" class="text-red-500 text-xs italic">{{ validationErrors.amortization }}</p>
+        </div>
         <div class="flex items-center justify-between">
           <button
             type="submit"
@@ -119,6 +131,7 @@ interface DebtForm {
   nir: number;
   aer: number;
   start_date: string;
+  amortization: string;
 }
 
 const debt = ref<DebtForm | null>(null); // Initialize as null
@@ -135,12 +148,13 @@ const validationErrors = ref({
   nir: '',
   aer: '',
   start_date: '',
+  amortization: '',
 });
 
 const validateForm = () => {
   let isValid = true;
   // Reset validation errors
-  validationErrors.value = { title: '', debt: '', periodicity: '', payment_term: '', nir: '', aer: '', start_date: '' };
+  validationErrors.value = { title: '', debt: '', periodicity: '', payment_term: '', nir: '', aer: '', start_date: '', amortization: '' };
 
   if (!debt.value!.title) {
     validationErrors.value.title = 'Title is required.';
@@ -170,6 +184,10 @@ const validateForm = () => {
     validationErrors.value.start_date = 'Start date is required.';
     isValid = false;
   }
+  if (!debt.value!.amortization) {
+    validationErrors.value.amortization = 'Amortization type is required.';
+    isValid = false;
+  }
 
   return isValid;
 };
@@ -192,8 +210,9 @@ const handleSubmit = async () => {
 
 onMounted(async () => {
   if (route.query.id) {
-    const debtId = parseInt(route.query.id as string);
+    const debtId = route.query.id as string;
     await debtStore.loadDebts(); // Ensure debts are loaded
+    console.log('Debts in store after load:', debtStore.debts);
     const existingDebt = debtStore.debts.find(d => d.id === debtId);
     if (existingDebt) {
       debt.value = { ...existingDebt };
@@ -214,6 +233,7 @@ onMounted(async () => {
       nir: 0,
       aer: 0,
       start_date: formattedDate,
+      amortization: 'french',
     };
   }
 });

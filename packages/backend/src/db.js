@@ -12,6 +12,19 @@ const debtSchema = new mongoose.Schema({
   nir: { type: Number, required: true },
   aer: { type: Number, required: true },
   start_date: { type: Date, required: true },
+  amortization: { type: String, enum: ['french'], default: 'french' },
+});
+
+const amortizationSchema = new mongoose.Schema({
+  debt_id: { type: mongoose.Schema.Types.ObjectId, ref: 'Debt', required: true },
+  schedule: [
+    {
+      month: { type: Number, required: true },
+      interest: { type: Number, required: true },
+      principal: { type: Number, required: true },
+      remaining_balance: { type: Number, required: true },
+    },
+  ],
 });
 
 const globalInfoSchema = new mongoose.Schema({
@@ -20,6 +33,7 @@ const globalInfoSchema = new mongoose.Schema({
 });
 
 const Debt = mongoose.model('Debt', debtSchema);
+const Amortization = mongoose.model('Amortization', amortizationSchema);
 const GlobalInfo = mongoose.model('GlobalInfo', globalInfoSchema);
 
 /**
@@ -37,4 +51,4 @@ async function initializeDatabase() {
   }
 }
 
-module.exports = { initializeDatabase, Debt, GlobalInfo };
+module.exports = { initializeDatabase, Debt, GlobalInfo, Amortization };

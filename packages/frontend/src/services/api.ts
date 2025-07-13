@@ -3,7 +3,7 @@ import { useUiStore } from '../store/uiStore';
 import { useNotificationStore } from '@/store/notificationStore';
 
 interface Debt {
-  id?: number;
+  id?: string;
   title: string;
   debt: number;
   periodicity: string;
@@ -11,6 +11,20 @@ interface Debt {
   nir: number;
   aer: number;
   start_date: string;
+  amortization?: string;
+}
+
+interface AmortizationEntry {
+  month: number;
+  interest: number;
+  principal: number;
+  remaining_balance: number;
+}
+
+interface AmortizationSchedule {
+  _id: string;
+  debt_id: string;
+  schedule: AmortizationEntry[];
 }
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000';
@@ -94,7 +108,7 @@ export const addDebt = async (data: Debt) => {
   }
 };
 
-export const updateDebt = async (id: number, data: Partial<Debt>) => {
+export const updateDebt = async (id: string, data: Partial<Debt>) => {
   const notificationStore = useNotificationStore();
   try {
     const response = await api.put(`/debts/${id}`, data);
@@ -107,7 +121,7 @@ export const updateDebt = async (id: number, data: Partial<Debt>) => {
   }
 };
 
-export const deleteDebt = async (id: number) => {
+export const deleteDebt = async (id: string) => {
   const notificationStore = useNotificationStore();
   try {
     const response = await api.delete(`/debts/${id}`);
@@ -116,6 +130,18 @@ export const deleteDebt = async (id: number) => {
   } catch (error: any) {
     console.error('Error deleting debt:', error);
     notificationStore.showNotification(`Error deleting debt: ${error.message}`, 'error');
+    throw error;
+  }
+};
+
+export const fetchAmortizationSchedule = async (debtId: string): Promise<AmortizationSchedule> => {
+  const notificationStore = useNotificationStore();
+  try {
+    const response = await api.get(`/debts/${debtId}/amortization`);
+    return response.data;
+  } catch (error: any) {
+    console.error('Error fetching amortization schedule:', error);
+    notificationStore.showNotification(`Error fetching amortization schedule: ${error.message}`, 'error');
     throw error;
   }
 };

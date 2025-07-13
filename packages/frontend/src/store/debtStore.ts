@@ -2,7 +2,7 @@ import { defineStore } from 'pinia';
 import { addDebt, fetchDebts, updateDebt, deleteDebt } from '../services/api';
 
 interface Debt {
-  id?: number;
+  id?: string;
   title: string;
   debt: number;
   periodicity: string;
@@ -10,6 +10,7 @@ interface Debt {
   nir: number;
   aer: number;
   start_date: string;
+  amortization?: string;
 }
 
 interface DebtState {
@@ -23,7 +24,11 @@ export const useDebtStore = defineStore('debts', {
   actions: {
     async loadDebts() {
       try {
-        this.debts = await fetchDebts();
+        const fetchedDebts = await fetchDebts();
+        this.debts = fetchedDebts.map((debt: any) => ({
+          ...debt,
+          id: debt._id,
+        }));
       } catch (error) {
         console.error('Failed to load debts:', error);
       }
@@ -38,7 +43,7 @@ export const useDebtStore = defineStore('debts', {
         alert('Failed to add debt.');
       }
     },
-    async updateDebt(id: number, debt: Debt) {
+    async updateDebt(id: string, debt: Debt) {
       try {
         await updateDebt(id, debt);
         await this.loadDebts(); // Reload debts after updating
@@ -48,7 +53,7 @@ export const useDebtStore = defineStore('debts', {
         alert('Failed to update debt.');
       }
     },
-    async deleteDebt(id: number) {
+    async deleteDebt(id: string) {
       try {
         await deleteDebt(id);
         await this.loadDebts(); // Reload debts after deleting

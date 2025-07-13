@@ -14,6 +14,7 @@
             <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Payment Term</th>
             <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">NIR</th>
             <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">AER</th>
+            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Amortization</th>
             <th scope="col" class="relative px-6 py-3"><span class="sr-only">Actions</span></th>
           </tr>
         </thead>
@@ -25,6 +26,7 @@
             <td class="px-6 py-4 whitespace-nowrap">{{ debtItem.payment_term }}</td>
             <td class="px-6 py-4 whitespace-nowrap">{{ debtItem.nir }}%</td>
             <td class="px-6 py-4 whitespace-nowrap">{{ debtItem.aer }}%</td>
+            <td class="px-6 py-4 whitespace-nowrap">{{ debtItem.amortization }}</td>
             <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
               <router-link :to="`/debt-entry?id=${debtItem.id}`" class="text-indigo-600 hover:text-indigo-900 mr-4">Edit</router-link>
               <button @click="confirmDelete(debtItem.id)" class="text-red-600 hover:text-red-900">Delete</button>
@@ -48,7 +50,8 @@ onMounted(() => {
   debtStore.loadDebts();
 });
 
-const confirmDelete = async (id: number) => {
+const confirmDelete = async (id: string) => {
+  console.log('Attempting to delete debt with ID:', id);
   if (confirm('Are you sure you want to delete this debt?')) {
     await debtStore.deleteDebt(id);
   }

@@ -3,7 +3,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { Bar } from 'vue-chartjs';
 import {
   Chart as ChartJS,
@@ -15,46 +15,47 @@ import {
   LinearScale,
 } from 'chart.js';
 import { useDebtStore } from '../store/debtStore';
+import { storeToRefs } from 'pinia';
+import { fetchAmortizationSchedule } from '../services/api';
 
 ChartJS.register(Title, Tooltip, Legend, BarElement, CategoryScale, LinearScale);
 
 const debtStore = useDebtStore();
+const { debts } = storeToRefs(debtStore);
 
-const calculateMonthlyPayment = (debtAmount: number, nir: number, paymentTerm: number, periodicity: string): number => {
-  // Simple approximation for monthly payment. A real application would use a more precise amortization formula.
-  // For now, let's assume NIR is annual and convert it to monthly if periodicity is monthly.
-  // This is a simplified calculation and might need adjustment based on actual financial formulas.
+const monthlyPayments = ref<{ [debtId: string]: number }>({});
+const isLoadingAmortization = ref(false);
 
-  let monthlyRate = nir / 100 / 12; // Convert annual NIR to monthly rate
-  let numberOfPayments = paymentTerm; // Assuming paymentTerm is already in months or equivalent periods
-
-  if (periodicity === 'annually') {
-    monthlyRate = nir / 100 / 12; // Still convert to monthly rate
-    numberOfPayments = paymentTerm * 12; // Convert years to months
-  } else if (periodicity === 'quarterly') {
-    monthlyRate = nir / 100 / 4; // Convert annual NIR to quarterly rate
-    numberOfPayments = paymentTerm * 4; // Convert quarters to months
-  } else if (periodicity === 'weekly') {
-    monthlyRate = nir / 100 / 52; // Convert annual NIR to weekly rate
-    numberOfPayments = paymentTerm * 52; // Convert weeks to months
-  } else if (periodicity === 'bi-weekly') {
-    monthlyRate = nir / 100 / 26; // Convert annual NIR to bi-weekly rate
-    numberOfPayments = paymentTerm * 26; // Convert bi-weeks to months
+const getMonthlyPaymentFromSchedule = (schedule: any[]): number => {
+  if (schedule && schedule.length > 0) {
+    return schedule[0].principal + schedule[0].interest;
   }
-
-  if (monthlyRate === 0) {
-    return debtAmount / numberOfPayments; // Simple division if no interest
-  } else {
-    // Amortization formula for fixed payments
-    return (debtAmount * monthlyRate) / (1 - Math.pow(1 + monthlyRate, -numberOfPayments));
-  }
+  return 0;
 };
 
+watch(debts, async (newDebts) => {
+  isLoadingAmortization.value = true;
+  const newMonthlyPayments: { [debtId: string]: number } = {};
+  for (const debt of newDebts) {
+    if (debt.amortization === 'french' && debt.id) {
+      try {
+        const schedule = await fetchAmortizationSchedule(debt.id);
+        newMonthlyPayments[debt.id] = getMonthlyPaymentFromSchedule(schedule.schedule);
+      } catch (error) {
+        console.error(`Error fetching amortization for debt ${debt.id}:`, error);
+        newMonthlyPayments[debt.id] = 0;
+      }
+    } else {
+      newMonthlyPayments[debt.id!] = 0;
+    }
+  }
+  monthlyPayments.value = newMonthlyPayments;
+  isLoadingAmortization.value = false;
+}, { immediate: true });
+
 const chartData = computed(() => {
-  const labels = debtStore.debts.map(debt => debt.title);
-  const monthlyBurdens = debtStore.debts.map(debt =>
-    calculateMonthlyPayment(debt.debt, debt.nir, debt.payment_term, debt.periodicity)
-  );
+  const labels = debts.value.map(debt => debt.title);
+  const burdens = debts.value.map(debt => monthlyPayments.value[debt.id!] || 0);
 
   return {
     labels: labels,
@@ -62,7 +63,7 @@ const chartData = computed(() => {
       {
         label: 'Monthly Burden',
         backgroundColor: '#42A5F5',
-        data: monthlyBurdens,
+        data: burdens,
       },
     ],
   };
